@@ -1,0 +1,168 @@
+Create Name Space : 
+kubectl create namespace ingress-nginx
+
+
+Download ingress controller:
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+
+##################################deploy01.yaml
+# nginx-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+			env:
+			-name: TITLE
+			 value: "Application 01"
+			 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  type: ClusterIP
+  ports:
+  -port: 80
+  selector:
+	app: nginx
+	
+	
+#################### deploy2.yml
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpd
+  template:
+    metadata:
+      labels:
+        app: httpd
+    spec:
+      containers:
+        - name: httpd
+          image: httpd
+          ports:
+            - containerPort: 80
+          env:
+            - name: TITLE
+              value: "application02"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httpd
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+  selector:
+    app: httpd
+	
+###############################ingress-resource.yml
+
+# nginx-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+	nginx.ingress.kubernetes.io/use-regex: "true"
+	nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  -http:
+	paths:
+	- path: /nginx(/|$)(.*)
+		pathType: Prefix
+		backend:
+		  service:
+			name: nginx
+                port:
+                  number: 80
+	- path: /httpd(/|$)(.*)
+		pathType: Prefix
+		backend:
+		  service:
+			name: httpd
+                port:
+                  number: 80
+	- path: /(.*)
+		pathType: Prefix
+		backend:
+		  service:
+			name: nginx
+                port:
+                  number: 80
+				  
+##################################################################################
+
+
+
+
+1 - Create a Name space 
+		kubectl create namespace ingress-nginx
+		
+2- 	Deploy Ingress Controller
+		kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+3- 	Check the below , all should be empty 
+		kubectl get pods
+		kubectl get svc 
+		kubectl get -n ingress-nginx
+
+4- 	Deploy both httpd and nginx deployments 
+		kubectl apply -f deploy01.yml
+		kubectl apply -f deploy02.yml
+		
+5- 	Deploy Ingress Rules 
+		kubectl apply -f ingress-resource.yml
+		
+6 - Check the pods 
+		kubectl get pods -o wide
+		
+		NAME                     READY   STATUS    RESTARTS   AGE   IP          NODE           NOMINATED NODE   READINESS GATES
+		httpd-566897f97d-c5665   1/1     Running   0          20m   10.44.0.2   workernode01   <none>           <none>
+		nginx-5f655c5869-7rxlq   1/1     Running   0          21m   10.36.0.2   workernode02   <none>           <none>
+
+7 -	Check the services 
+		kubectl get svc
+		NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+		httpd        ClusterIP   10.107.13.157   <none>        80/TCP    19m
+		kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP   6d
+		nginx        ClusterIP   10.108.56.33    <none>        80/TCP    22m
+
+8-  Check the ingress sevices  
+		kubectl get svc -n ingress-nginx
+		
+		NAME                                 TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+		ingress-nginx-controller             LoadBalancer   10.105.92.105   <pending>     80:31337/TCP,443:31763/TCP   27m
+		ingress-nginx-controller-admission   ClusterIP      10.110.81.198   <none>        443/TCP                      27m
+
+
+
